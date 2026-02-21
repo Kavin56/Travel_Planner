@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ReactMarkdown from 'react-markdown';
-import { 
-  MessageCircle, 
-  Send, 
-  X, 
-  Loader2, 
-  User, 
-  Bot, 
+import {
+  MessageCircle,
+  Send,
+  X,
+  Loader2,
+  User,
+  Bot,
   Sparkles,
   Plane,
   DollarSign,
@@ -19,14 +19,11 @@ import {
   MapPin
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-// Initialize the Google Generative AI client
-let API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-if (!API_KEY) {
-  API_KEY = "AIzaSyDCxb3mTA_rSRGltD8b8tr-4Yzkp7w1R70";
-}
-const genAI = new GoogleGenerativeAI(API_KEY);
+// Hardcoded API key
+const API_KEY = "AIzaSyBvDb1ncmMBj1PogqaRj72GjAx7q3BuzVI";
+const genAI = new GoogleGenAI({ apiKey: API_KEY });
 
 interface Message {
   id: string;
@@ -64,9 +61,7 @@ const SupportChatbot = ({ isOpen, onClose }: SupportChatbotProps) => {
 
   const generateResponse = async (userMessage: string) => {
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-      const prompt = `You are a friendly and knowledgeable travel planning sales assistant for a travel planning website. Your role is to help customers plan their trips by providing personalized recommendations and advice.
+      const chatbotPrompt = `You are a friendly and knowledgeable travel planning sales assistant for a travel planning website. Your role is to help customers plan their trips by providing personalized recommendations and advice.
 
 Key responsibilities:
 - Help customers choose destinations based on their preferences, budget, and time constraints
@@ -100,9 +95,11 @@ If they ask about timing, consider weather, crowds, and prices.
 
 Always be encouraging and make them excited about their potential trip!`;
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const botResponse = response.text();
+      const response = await genAI.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: chatbotPrompt,
+      });
+      const botResponse = response.text;
 
       return botResponse;
     } catch (error) {
@@ -199,11 +196,10 @@ Always be encouraging and make them excited about their potential trip!`;
               className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`flex items-start space-x-2 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.sender === 'user' 
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500' 
-                    : 'bg-gradient-to-r from-blue-500 to-purple-600'
-                }`}>
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${message.sender === 'user'
+                  ? 'bg-gradient-to-r from-orange-500 to-red-500'
+                  : 'bg-gradient-to-r from-blue-500 to-purple-600'
+                  }`}>
                   {message.sender === 'user' ? (
                     <User className="h-4 w-4 text-white" />
                   ) : (
@@ -217,19 +213,19 @@ Always be encouraging and make them excited about their potential trip!`;
                         <div className="whitespace-pre-wrap">{message.text}</div>
                       ) : (
                         <div className="prose prose-sm max-w-none">
-                          <ReactMarkdown 
+                          <ReactMarkdown
                             components={{
-                              h1: ({children}) => <h1 className="text-lg font-bold text-gray-900 mb-2">{children}</h1>,
-                              h2: ({children}) => <h2 className="text-base font-bold text-gray-900 mb-2">{children}</h2>,
-                              h3: ({children}) => <h3 className="text-sm font-bold text-gray-900 mb-1">{children}</h3>,
-                              p: ({children}) => <p className="mb-2">{children}</p>,
-                              ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                              ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                              li: ({children}) => <li className="text-sm">{children}</li>,
-                              strong: ({children}) => <strong className="font-bold text-gray-900">{children}</strong>,
-                              em: ({children}) => <em className="italic">{children}</em>,
-                              code: ({children}) => <code className="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                              blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600">{children}</blockquote>,
+                              h1: ({ children }) => <h1 className="text-lg font-bold text-gray-900 mb-2">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-base font-bold text-gray-900 mb-2">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-sm font-bold text-gray-900 mb-1">{children}</h3>,
+                              p: ({ children }) => <p className="mb-2">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                              li: ({ children }) => <li className="text-sm">{children}</li>,
+                              strong: ({ children }) => <strong className="font-bold text-gray-900">{children}</strong>,
+                              em: ({ children }) => <em className="italic">{children}</em>,
+                              code: ({ children }) => <code className="bg-gray-200 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                              blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600">{children}</blockquote>,
                             }}
                           >
                             {message.text}
@@ -245,7 +241,7 @@ Always be encouraging and make them excited about their potential trip!`;
               </div>
             </div>
           ))}
-          
+
           {isLoading && (
             <div className="flex justify-start">
               <div className="flex items-start space-x-2 max-w-[80%]">
@@ -263,7 +259,7 @@ Always be encouraging and make them excited about their potential trip!`;
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 

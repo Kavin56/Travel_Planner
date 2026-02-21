@@ -11,29 +11,13 @@ interface ItineraryModalProps {
   onClose: () => void;
 }
 
-interface ItineraryResponse {
-  id: string;
-  destination: string;
-  numberOfDays: number;
-  itinerary: DayItinerary[];
-  createdAt: string;
-}
-
-interface DayItinerary {
-  day: number;
-  activities: Activity[];
-}
-
-interface Activity {
-  time: string;
-  activity: string;
-  description: string;
-  location?: string;
-}
+import { ItineraryResponse, Activity, DayItinerary } from "@/services/geminiService";
+import ActivityModal from "./ActivityModal";
 
 const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
   const { toast } = useToast();
   const [itinerary, setItinerary] = useState<ItineraryResponse | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<{ dayIndex: number, activity: Activity } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -50,9 +34,42 @@ const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
     setIsLoading(false);
   }, [itineraryId]);
 
+  const handleLocalUpdate = (dayIndex: number, updated: Activity) => {
+    if (!itinerary) return;
+    const newItinerary = { ...itinerary };
+    newItinerary.itinerary[dayIndex].activities = newItinerary.itinerary[dayIndex].activities.map(
+      a => a.id === updated.id ? updated : a
+    );
+    setItinerary(newItinerary);
+    updateCache(newItinerary);
+  };
+
+  const handleLocalDelete = (dayIndex: number, activityId: string) => {
+    if (!itinerary) return;
+    const newItinerary = { ...itinerary };
+    newItinerary.itinerary[dayIndex].activities = newItinerary.itinerary[dayIndex].activities.filter(
+      a => a.id !== activityId
+    );
+    setItinerary(newItinerary);
+    updateCache(newItinerary);
+    setSelectedActivity(null);
+  };
+
+  const updateCache = (updatedItinerary: ItineraryResponse) => {
+    const cached = localStorage.getItem('recentItineraries');
+    if (cached) {
+      const recent = JSON.parse(cached);
+      const index = recent.findIndex((it: ItineraryResponse) => it.id === updatedItinerary.id);
+      if (index !== -1) {
+        recent[index] = updatedItinerary;
+        localStorage.setItem('recentItineraries', JSON.stringify(recent));
+      }
+    }
+  };
+
   const exportToHTML = async () => {
     if (!itinerary) return;
-    
+
     setIsExporting(true);
     try {
       htmlExportService.exportToHTML(itinerary);
@@ -73,12 +90,12 @@ const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
 
   const exportToText = () => {
     if (!itinerary) return;
-    
+
     // Create a simple text-based export for now
     let content = `Travel Itinerary: ${itinerary.destination}\n`;
     content += `Duration: ${itinerary.numberOfDays} days\n`;
     content += `Created: ${new Date(itinerary.createdAt).toLocaleDateString()}\n\n`;
-    
+
     itinerary.itinerary.forEach(day => {
       content += `Day ${day.day}:\n`;
       day.activities.forEach(activity => {
@@ -91,7 +108,7 @@ const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
         content += '\n';
       });
     });
-    
+
     // Create and download the file
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -102,7 +119,7 @@ const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Text Export Successful!",
       description: "Your itinerary has been downloaded as a text file.",
@@ -177,10 +194,22 @@ const ItineraryModal = ({ itineraryId, onClose }: ItineraryModalProps) => {
             <div className="text-sm text-gray-500 mb-4">
               Created on {new Date(itinerary.createdAt).toLocaleDateString()}
             </div>
-            <ItineraryDisplay itinerary={itinerary} />
+            <ItineraryDisplay
+              itinerary={itinerary}
+              onActivityClick={(dayIndex, activity) => setSelectedActivity({ dayIndex, activity })}
+            />
           </div>
         )}
       </DialogContent>
+      {selectedActivity && (
+        <ActivityModal
+          activity={selectedActivity.activity}
+          isOpen={!!selectedActivity}
+          onClose={() => setSelectedActivity(null)}
+          onUpdate={(updated) => handleLocalUpdate(selectedActivity.dayIndex, updated)}
+          onDelete={() => handleLocalDelete(selectedActivity.dayIndex, selectedActivity.activity.id)}
+        />
+      )}
     </Dialog>
   );
 };

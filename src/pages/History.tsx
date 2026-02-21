@@ -49,7 +49,7 @@ const History = () => {
     if (cached) {
       const itineraries = JSON.parse(cached);
       const fullItinerary = itineraries.find((it: any) => it.id === item.id);
-      
+
       if (fullItinerary) {
         setIsExporting(item.id);
         try {
@@ -77,13 +77,13 @@ const History = () => {
     if (cached) {
       const itineraries = JSON.parse(cached);
       const fullItinerary = itineraries.find((it: any) => it.id === item.id);
-      
+
       if (fullItinerary) {
         // Create export content
         let content = `Travel Itinerary: ${fullItinerary.destination}\n`;
         content += `Duration: ${fullItinerary.numberOfDays} days\n`;
         content += `Created: ${new Date(fullItinerary.createdAt).toLocaleDateString()}\n\n`;
-        
+
         fullItinerary.itinerary.forEach((day: any) => {
           content += `Day ${day.day}:\n`;
           day.activities.forEach((activity: any) => {
@@ -96,7 +96,7 @@ const History = () => {
             content += '\n';
           });
         });
-        
+
         // Create and download the file
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -107,7 +107,7 @@ const History = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         toast({
           title: "Text Export Successful!",
           description: "Your itinerary has been downloaded as a text file.",
@@ -130,7 +130,11 @@ const History = () => {
       'rome': 'photo-1552832230-c0197dd311b5',
       'amsterdam': 'photo-1534351590666-13e3e96b5017'
     };
-    
+
+    if (!destination) {
+      return 'photo-1500375592092-40eb2168fd21'; // Default travel image
+    }
+
     const key = destination.toLowerCase();
     return images[key] || 'photo-1500375592092-40eb2168fd21'; // Default travel image
   };
@@ -156,13 +160,13 @@ const History = () => {
       {/* Enhanced Header Section */}
       <div className="relative overflow-hidden">
         {/* Background with animated elements */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1488646953014-85cb44e25828?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')`
           }}
         />
-        
+
         {/* Animated background shapes */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-20 -right-20 w-60 h-60 bg-orange-200/20 rounded-full animate-pulse"></div>
@@ -176,14 +180,14 @@ const History = () => {
               <Globe className="h-8 w-8 animate-spin-slow" />
               <span className="text-lg font-medium opacity-90">Your Travel Journey</span>
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-slide-in-left" style={{ animationDelay: '0.2s' }}>
               My Travel History
             </h1>
             <p className="text-xl opacity-90 mb-8 animate-slide-in-left" style={{ animationDelay: '0.4s' }}>
               Revisit your amazing adventures and get inspired for your next journey.
             </p>
-            
+
             {/* Enhanced Stats */}
             <div className="grid grid-cols-3 gap-6 text-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
               <div className="group cursor-pointer transform transition-all duration-300 hover:scale-110">
@@ -243,21 +247,21 @@ const History = () => {
       ) : (
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
           {cachedItineraries.map((item: HistoryItem, index) => (
-            <Card 
-              key={item.id} 
+            <Card
+              key={item.id}
               className="shadow-xl border-0 bg-white hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-rotate-1 overflow-hidden group animate-slide-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               {/* Destination Image Header */}
               <div className="relative h-48 overflow-hidden">
-                <div 
+                <div
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                   style={{
                     backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)), url('https://images.unsplash.com/${getDestinationImage(item.destination)}?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80')`
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                
+
                 {/* Floating badges */}
                 <div className="absolute top-4 left-4">
                   <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 font-semibold">
@@ -265,13 +269,13 @@ const History = () => {
                     {item.numberOfDays} {item.numberOfDays === 1 ? 'day' : 'days'}
                   </Badge>
                 </div>
-                
+
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   <div className="bg-white/20 backdrop-blur-sm rounded-full p-2">
                     <Star className="h-4 w-4 text-yellow-300" fill="currentColor" />
                   </div>
                 </div>
-                
+
                 {/* Destination name overlay */}
                 <div className="absolute bottom-4 left-4 right-4">
                   <h3 className="text-2xl font-bold text-white mb-1 group-hover:text-orange-200 transition-colors">

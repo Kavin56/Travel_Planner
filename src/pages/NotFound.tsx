@@ -47,12 +47,6 @@ const NotFound = () => {
               Go Home
             </Button>
           </Link>
-          <Link to="/login">
-            <Button variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300 px-8 py-3 rounded-xl transition-all duration-300">
-              <Plane className="h-5 w-5 mr-2" />
-              Sign In
-            </Button>
-          </Link>
         </div>
 
         {/* Additional Info */}

@@ -1,70 +1,56 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, MapPin, Calendar, Clock, Download, Plane, Users, Star, Globe, TrendingUp, ChevronDown, ChevronUp, FileText, Mic } from "lucide-react";
-import { geminiService, ItineraryResponse } from "@/services/geminiService";
+import {
+  Loader2, MapPin, Calendar, Clock, Download, Plane, Users, Star,
+  Globe, TrendingUp, ChevronDown, ChevronUp, FileText, Compass,
+  Music, TreePine, Landmark, Footprints, Heart, Baby
+} from "lucide-react";
+import { geminiService, ItineraryResponse, Activity } from "@/services/geminiService";
 import { htmlExportService } from "@/services/htmlExportService";
 import { useToast } from "@/hooks/use-toast";
 import ItineraryDisplay from "@/components/ItineraryDisplay";
-import { useVoiceForm } from "@/hooks/useVoiceForm";
-import { eventBus } from '@/services/eventBus';
+import ActivityModal from "@/components/ActivityModal";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthModal from "@/components/AuthModal";
 
-const formSchema = z.object({
-  destination: z.string().min(1, "Please enter a destination"),
-  numberOfDays: z.string().refine(val => parseInt(val) > 0, {
-    message: "Trip must be at least 1 day",
-  }),
-});
-
-type FormData = z.infer<typeof formSchema>;
+const ADVENTURE_TYPES = [
+  { id: 'balanced', label: 'Balanced', icon: Compass },
+  { id: 'party', label: 'Party', icon: Music },
+  { id: 'nature', label: 'Nature', icon: TreePine },
+  { id: 'culture', label: 'Culture', icon: Landmark },
+  { id: 'adventure', label: 'Adventure', icon: Footprints },
+  { id: 'romantic', label: 'Romantic', icon: Heart },
+  { id: 'family', label: 'Family', icon: Baby },
+];
 
 const Home = () => {
+  const [destination, setDestination] = useState("");
+  const [numberOfDays, setNumberOfDays] = useState<string>("1");
   const [itinerary, setItinerary] = useState<ItineraryResponse | null>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [adventureType, setAdventureType] = useState("balanced");
+  const [selectedActivity, setSelectedActivity] = useState<{ dayIndex: number, activity: Activity } | null>(null);
+  const { user } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const itineraryRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      destination: "",
-      numberOfDays: "1",
-    },
-  });
-
-  const { listeningField, startListening } = useVoiceForm({
-    setValue: form.setValue,
-    triggerSubmit: form.handleSubmit((data) => mutation.mutate({ destination: data.destination, numberOfDays: Number(data.numberOfDays) })),
-  });
-  
-  // Handle scroll events for floating button
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 300);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   const mutation = useMutation({
     mutationFn: geminiService.generateItinerary,
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       setItinerary(data);
       toast({
         title: "Trip Planned Successfully!",
-        description: `Your ${variables.numberOfDays}-day trip to ${variables.destination} is ready!`,
+        description: `Your ${numberOfDays}-day trip to ${destination} is ready!`,
       });
-      
+
+      // Cache in localStorage
       const cached = localStorage.getItem('recentItineraries');
       const recent = cached ? JSON.parse(cached) : [];
       recent.unshift(data);
@@ -79,31 +65,106 @@ const Home = () => {
     },
   });
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate({ destination: data.destination, numberOfDays: Number(data.numberOfDays) });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      setIsAuthModalOpen(true);
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to generate your personalized travel plan.",
+      });
+      return;
+    }
+
+    if (!destination.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your destination",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (Number(numberOfDays) < 1) {
+      toast({
+        title: "Invalid Duration",
+        description: "Trip duration must be at least 1 day",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    mutation.mutate({
+      destination: destination.trim(),
+      numberOfDays: Number(numberOfDays),
+      adventureType
+    });
+  };
+
+
+  const handleUpdateActivity = (dayIndex: number, updatedActivity: Activity) => {
+    if (!itinerary) return;
+
+    const newItinerary = { ...itinerary };
+    newItinerary.itinerary[dayIndex].activities = newItinerary.itinerary[dayIndex].activities.map(
+      a => a.id === updatedActivity.id ? updatedActivity : a
+    );
+
+    setItinerary(newItinerary);
+    // Update cache
+    const cached = localStorage.getItem('recentItineraries');
+    if (cached) {
+      const recent = JSON.parse(cached);
+      const index = recent.findIndex((it: ItineraryResponse) => it.id === itinerary.id);
+      if (index !== -1) {
+        recent[index] = newItinerary;
+        localStorage.setItem('recentItineraries', JSON.stringify(recent));
+      }
+    }
+  };
+
+  const handleDeleteActivity = (dayIndex: number, activityId: string) => {
+    if (!itinerary) return;
+
+    const newItinerary = { ...itinerary };
+    newItinerary.itinerary[dayIndex].activities = newItinerary.itinerary[dayIndex].activities.filter(
+      a => a.id !== activityId
+    );
+
+    setItinerary(newItinerary);
+    // Update cache
+    const cached = localStorage.getItem('recentItineraries');
+    if (cached) {
+      const recent = JSON.parse(cached);
+      const index = recent.findIndex((it: ItineraryResponse) => it.id === itinerary.id);
+      if (index !== -1) {
+        recent[index] = newItinerary;
+        localStorage.setItem('recentItineraries', JSON.stringify(recent));
+      }
+    }
   };
 
   const scrollToItinerary = () => {
     if (itineraryRef.current) {
-      itineraryRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
+      itineraryRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
       });
     }
   };
 
   const scrollToTop = () => {
     if (topRef.current) {
-      topRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
+      topRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
       });
     }
   };
 
   const exportToHTML = async () => {
     if (!itinerary) return;
-    
+
     setIsExporting(true);
     try {
       htmlExportService.exportToHTML(itinerary);
@@ -124,12 +185,12 @@ const Home = () => {
 
   const exportToText = () => {
     if (!itinerary) return;
-    
+
     // Create a simple text-based export for now
     let content = `Travel Itinerary: ${itinerary.destination}\n`;
     content += `Duration: ${itinerary.numberOfDays} days\n`;
     content += `Created: ${new Date(itinerary.createdAt).toLocaleDateString()}\n\n`;
-    
+
     itinerary.itinerary.forEach(day => {
       content += `Day ${day.day}:\n`;
       day.activities.forEach(activity => {
@@ -142,7 +203,7 @@ const Home = () => {
         content += '\n';
       });
     });
-    
+
     // Create and download the file
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -153,39 +214,25 @@ const Home = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     toast({
       title: "Text Export Successful!",
       description: "Your itinerary has been downloaded as a text file.",
     });
   };
 
-  useEffect(() => {
-    const handlePlanItinerary = (data: { destination: string, numberOfDays: string }) => {
-      form.setValue('destination', data.destination);
-      form.setValue('numberOfDays', data.numberOfDays);
-      mutation.mutate({ destination: data.destination, numberOfDays: Number(data.numberOfDays) });
-    };
-
-    const unsubscribe = eventBus.on('planItinerary', handlePlanItinerary);
-
-    return () => {
-      unsubscribe();
-    };
-  }, [form, mutation]);
-
   return (
     <div className="space-y-8" ref={topRef}>
       {/* Enhanced Hero Section with Background Image */}
       <div className="relative overflow-hidden">
         {/* Background Image */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105 transition-transform duration-700 ease-out"
           style={{
             backgroundImage: `linear-gradient(135deg, rgba(251, 146, 60, 0.9), rgba(239, 68, 68, 0.8)), url('https://images.unsplash.com/photo-1500375592092-40eb2168fd21?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')`
           }}
         />
-        
+
         {/* Animated Overlay Elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full animate-pulse"></div>
@@ -199,19 +246,19 @@ const Home = () => {
               <Globe className="h-8 w-8 animate-spin-slow" />
               <span className="text-lg font-medium opacity-90">AI-Powered Travel Planning</span>
             </div>
-            
+
             <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-slide-in-left" style={{ animationDelay: '0.2s' }}>
               Where do you want to
               <span className="bg-gradient-to-r from-yellow-300 to-orange-200 bg-clip-text text-transparent animate-pulse">
                 {" "}explore?
               </span>
             </h1>
-            
+
             <p className="text-xl md:text-2xl opacity-90 mb-8 animate-slide-in-left max-w-3xl" style={{ animationDelay: '0.4s' }}>
-              Discover amazing destinations with personalized itineraries crafted just for you. 
+              Discover amazing destinations with personalized itineraries crafted just for you.
               From hidden gems to must-see attractions.
             </p>
-            
+
             {/* Enhanced Stats with Animation */}
             <div className="grid grid-cols-3 gap-6 md:gap-12 text-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
               <div className="group cursor-pointer transform transition-all duration-300 hover:scale-110">
@@ -256,64 +303,88 @@ const Home = () => {
           </CardTitle>
           <p className="text-gray-600 text-lg">AI-powered itineraries in seconds</p>
         </CardHeader>
-        
+
         <CardContent className="p-8">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
             <div className="grid md:grid-cols-2 gap-8">
               <div className="space-y-3 group">
                 <Label htmlFor="destination" className="text-base font-semibold text-gray-700 flex items-center group-hover:text-orange-600 transition-colors">
                   <MapPin className="h-5 w-5 mr-2 text-orange-500 group-hover:animate-pulse" />
                   Where are you going?
                 </Label>
-                <div className="relative">
-                  <Input
-                    id="destination"
-                    placeholder="e.g., Bali, Paris, Tokyo"
-                    className="h-14 text-lg pl-4 pr-12"
-                    {...form.register("destination")}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full ${listeningField === 'destination' ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`}
-                    onClick={() => startListening('destination')}
-                  >
-                    <Mic className="h-5 w-5" />
-                  </Button>
-                </div>
-                {form.formState.errors.destination && (
-                  <p className="text-sm text-red-500">{form.formState.errors.destination.message}</p>
-                )}
+                <Input
+                  id="destination"
+                  type="text"
+                  placeholder="Enter your dream destination (e.g., Bali, Paris, Tokyo)"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                  className="h-14 text-lg border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl transition-all duration-300 hover:shadow-md"
+                  disabled={mutation.isPending}
+                />
               </div>
 
               <div className="space-y-3 group">
-                <Label htmlFor="numberOfDays" className="text-base font-semibold text-gray-700 flex items-center group-hover:text-orange-600 transition-colors">
+                <Label htmlFor="days" className="text-base font-semibold text-gray-700 flex items-center group-hover:text-orange-600 transition-colors">
                   <Calendar className="h-5 w-5 mr-2 text-orange-500 group-hover:animate-pulse" />
                   How many days?
                 </Label>
                 <div className="relative">
                   <Input
-                    id="numberOfDays"
+                    id="days"
                     type="number"
                     min="1"
-                    placeholder="e.g., 5"
-                    className="h-14 text-lg pl-4 pr-12"
-                    {...form.register("numberOfDays")}
+                    max="30"
+                    step="1"
+                    value={numberOfDays}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      // Allow empty string for controlled input
+                      if (val === "") {
+                        setNumberOfDays("");
+                      } else if (/^\d{1,2}$/.test(val) && Number(val) >= 1 && Number(val) <= 30) {
+                        setNumberOfDays(val);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === '' || Number(e.target.value) < 1) {
+                        setNumberOfDays("1");
+                      }
+                    }}
+                    className="h-14 text-lg border-2 border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl pr-16 transition-all duration-300 hover:shadow-md"
+                    disabled={mutation.isPending}
+                    placeholder="1"
                   />
-                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full ${listeningField === 'numberOfDays' ? 'text-blue-500 animate-pulse' : 'text-gray-400'}`}
-                    onClick={() => startListening('numberOfDays')}
-                  >
-                    <Mic className="h-5 w-5" />
-                  </Button>
+                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                    {Number(numberOfDays) === 1 ? 'day' : 'days'}
+                  </span>
                 </div>
-                 {form.formState.errors.numberOfDays && (
-                  <p className="text-sm text-red-500">{form.formState.errors.numberOfDays.message}</p>
-                )}
+              </div>
+            </div>
+
+            {/* Adventure Type Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-semibold text-gray-700 flex items-center">
+                <Compass className="h-5 w-5 mr-2 text-orange-500" />
+                What's your mood for this trip?
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                {ADVENTURE_TYPES.map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <button
+                      key={type.id}
+                      type="button"
+                      onClick={() => setAdventureType(type.id)}
+                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-300 ${adventureType === type.id
+                        ? "border-orange-500 bg-orange-50 text-orange-700 shadow-md"
+                        : "border-gray-100 hover:border-orange-200 hover:bg-orange-50/50 text-gray-600"
+                        }`}
+                    >
+                      <Icon className={`h-6 w-6 mb-2 ${adventureType === type.id ? "text-orange-600" : "text-gray-400"}`} />
+                      <span className="text-xs font-medium">{type.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -365,7 +436,7 @@ const Home = () => {
           <h3 className="text-3xl font-bold text-gray-800 mb-3">Trending Destinations</h3>
           <p className="text-gray-600 text-lg">Discover where travelers are going this season</p>
         </div>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
           {[
             { name: 'Paris', image: 'photo-1502602898536-47ad22581b52', subtitle: 'City of Love' },
@@ -379,11 +450,11 @@ const Home = () => {
           ].map((city, index) => (
             <button
               key={city.name}
-              onClick={() => form.setValue("destination", city.name)}
+              onClick={() => setDestination(city.name)}
               className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-105 hover:-rotate-1"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div 
+              <div
                 className="h-32 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                 style={{
                   backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1)), url('https://images.unsplash.com/${city.image}?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80')`
@@ -453,20 +524,31 @@ const Home = () => {
               </div>
             </div>
           </div>
-          <ItineraryDisplay itinerary={itinerary} />
+          <ItineraryDisplay
+            itinerary={itinerary}
+            onActivityClick={(dayIndex, activity) => setSelectedActivity({ dayIndex, activity })}
+          />
         </div>
       )}
 
-      {/* Floating Scroll to Top Button */}
-      {showScrollTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 z-50 animate-fade-in"
-          aria-label="Scroll to top"
-        >
-          <ChevronUp className="h-6 w-6" />
-        </button>
+      {selectedActivity && (
+        <ActivityModal
+          activity={selectedActivity.activity}
+          isOpen={!!selectedActivity}
+          onClose={() => setSelectedActivity(null)}
+          onUpdate={(updatedActivity) => handleUpdateActivity(selectedActivity.dayIndex, updatedActivity)}
+          onDelete={() => {
+            handleDeleteActivity(selectedActivity.dayIndex, selectedActivity.activity.id);
+            setSelectedActivity(null);
+          }}
+        />
       )}
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        defaultMode="login"
+      />
     </div>
   );
 };
