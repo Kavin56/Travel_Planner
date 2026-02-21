@@ -439,14 +439,14 @@ const Home = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
           {[
-            { name: 'Paris', image: 'photo-1502602898536-47ad22581b52', subtitle: 'City of Love' },
-            { name: 'Tokyo', image: 'photo-1540959733332-eab4deabeeaf', subtitle: 'Modern Meets Traditional' },
-            { name: 'Bali', image: 'photo-1537953773345-d172ccf13cf1', subtitle: 'Island Paradise' },
-            { name: 'New York', image: 'photo-1496442226666-8d4d0e62e6e9', subtitle: 'The Big Apple' },
+            { name: 'Paris', image: 'photo-1499856871958-5b9627545d1a', subtitle: 'City of Love' },
+            { name: 'Tokyo', image: 'photo-1503899036084-c55cdd92da26', subtitle: 'Modern Meets Traditional' },
+            { name: 'Bali', image: 'photo-1537996194471-e657df975ab4', subtitle: 'Island Paradise' },
+            { name: 'New York', image: 'photo-1485871981521-5b1fd3805eee', subtitle: 'The Big Apple' },
             { name: 'Dubai', image: 'photo-1512453979798-5ea266f8880c', subtitle: 'Luxury & Innovation' },
             { name: 'London', image: 'photo-1513635269975-59663e0ac1ad', subtitle: 'Royal Heritage' },
             { name: 'Singapore', image: 'photo-1525625293386-3f8f99389edd', subtitle: 'Garden City' },
-            { name: 'Barcelona', image: 'photo-1539037116277-4db20889f2d4', subtitle: 'Art & Architecture' }
+            { name: 'Barcelona', image: 'photo-1583422409516-2895a77efded', subtitle: 'Art & Architecture' }
           ].map((city, index) => (
             <button
               key={city.name}
@@ -457,7 +457,7 @@ const Home = () => {
               <div
                 className="h-32 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1)), url('https://images.unsplash.com/${city.image}?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80')`
+                  backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1)), url('https://images.unsplash.com/${city.image}?auto=format&fit=crop&w=400&q=80')`
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
